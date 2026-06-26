@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Fonts: swap "Instrument Serif" / "Inter" below if your site uses different ones. -->
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Brand tokens - tweak these to restyle everything */
+  :root {
+    --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --ink: #1c1b29;        /* headings */
+    --body: #55556a;       /* paragraph text */
+    --muted: #8a8a9e;      /* labels / placeholder */
+    --accent: #6d5ae6;     /* Synquery violet */
+    --accent-dark: #5b48d4;
+    --border: #e6e6ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body {
+    font-family: var(--sans);
+    padding: 0;
+    color: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 600px; }
+
+  label {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .input-row { display: flex; gap: 10px; }
+  input {
+    flex: 1;
+    padding: 15px 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: var(--sans);
+    font-size: 17px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(109,90,230,0.12); }
+  button {
+    padding: 15px 26px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.18s;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: 0.55; cursor: default; }
+
+  .result {
+    margin-top: 22px;
+    padding: 20px 22px;
+    border-radius: 14px;
+    font-size: 16px;
+    display: none;
+  }
+  .result.verified    { background: #f3f1fe; border: 1px solid #ddd6fe; color: #3f2f9e; }
+  .result.not-verified{ background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
+  .result.neutral     { background: #f6f6fa; border: 1px solid #e8e8f0; color: #4a4a5e; }
+  .result-name { font-weight: 600; font-size: 18px; margin-bottom: 7px; }
+  .result-sub { font-size: 16px; margin-bottom: 14px; line-height: 1.55; }
+  .result-sub:last-child { margin-bottom: 0; }
+  .result a {
+    display: inline-block;
+    padding: 11px 20px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .result.verified a     { background: var(--accent); color: #fff; }
+  .result.not-verified a { background: #9a3412; color: #fff; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="input-row">
+    <input id="emailInput" type="email" autocomplete="off" spellcheck="false"
+           placeholder="name@synquery.ai" />
+    <button id="verifyBtn" type="button">Verify</button>
+  </div>
+  <div id="result" class="result" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+  // Config
+  // The anon key is safe to expose: it can ONLY call verify_sender (one email
+  // in, one answer out). It cannot read the table or list any addresses.
+  const SUPABASE_URL = "https://fgbctkcdpwexbuyuuosi.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnYmN0a2NkcHdleGJ1eXV1b3NpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMDI0MzcsImV4cCI6MjA3MDY3ODQzN30.aiWMUM_aZlH7O170nMbUpY8iG74usxOw5dgSQJuw8rc";
+  // Where "Report as spam" sends. Use a REAL Synquery inbox, not a sending domain.
+  const REPORT_EMAIL = "support@synquery.ai";
+
+  const input  = document.getElementById("emailInput");
+  const btn     = document.getElementById("verifyBtn");
+  const resultEl = document.getElementById("result");
+
+  btn.addEventListener("click", checkEmail);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") checkEmail(); });
+
+  function looksLikeEmail(v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+
+  // Build result DOM with textContent only — no innerHTML, so a stored name
+  // can never inject markup/script.
+  function render(kind, title, subNodes, link) {
+    resultEl.className = "result " + kind;
+    resultEl.replaceChildren();
+
+    const t = document.createElement("div");
+    t.className = "result-name";
+    t.textContent = title;
+    resultEl.appendChild(t);
+
+    for (const node of subNodes) {
+      const s = document.createElement("div");
+      s.className = "result-sub";
+      if (typeof node === "string") s.textContent = node;
+      else node.forEach((part) =>
+        s.appendChild(typeof part === "string" ? document.createTextNode(part) : part));
+      resultEl.appendChild(s);
+    }
+
+    if (link) {
+      const a = document.createElement("a");
+      a.href = link.href;
+      a.textContent = link.text;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      resultEl.appendChild(a);
+    }
+    resultEl.style.display = "block";
+  }
+
+  // Only trust https LinkedIn URLs — guards against a bad/garbage row.
+  function safeLinkedIn(url) {
+    if (!url) return null;
+    try {
+      const u = new URL(url);
+      if (u.protocol === "https:" && /(^|\.)linkedin\.com$/.test(u.hostname)) return u.href;
+    } catch (_) {}
+    return null;
+  }
+
+  async function checkEmail() {
+    const email = input.value.trim().toLowerCase();
+    resultEl.style.display = "none";
+
+    if (!looksLikeEmail(email)) {
+      render("neutral", "Enter a valid email address",
+        ["Type the full address (e.g. name@synquery.ai) and press Verify."]);
+      return;
+    }
+
+    btn.disabled = true;
+    const prevLabel = btn.textContent;
+    btn.textContent = "Checking…";
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_sender`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ p_email: email })
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status + ": " + (await res.text()).slice(0, 200));
+
+      const rows = await res.json();
+      const row = Array.isArray(rows) ? rows[0] : rows;
+
+      if (row && row.verified) {
+        const strong = document.createElement("strong");
+        strong.textContent = row.full_name || "the Synquery team";
+        const li = safeLinkedIn(row.linkedin_url);
+        render(
+          "verified",
+          "✅ This email really is from us",
+          [["This inbox belongs to ", strong, ", a real member of the Synquery team. Feel free to reply, or connect with them on LinkedIn."]],
+          li ? { href: li, text: "View LinkedIn profile →" } : null
+        );
+      } else {
+        render(
+          "not-verified",
+          "❌ We couldn't verify this address",
+          ["This address isn't one of our sending inboxes. If you received a message from it claiming to be Synquery, please treat it with caution — it may be impersonating us."],
+          {
+            href: `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent("Suspicious email report")}`
+              + `&body=${encodeURIComponent("I received a suspicious email from: " + email)}`,
+            text: "Report it to us →"
+          }
+        );
+      }
+    } catch (err) {
+      render("neutral", "Debug — error detail", [String(err && err.message ? err.message : err)]);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
+  }
+</script>
+</body>
+</html>
