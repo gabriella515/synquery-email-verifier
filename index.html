@@ -5,17 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Fonts: swap "Instrument Serif" / "Inter" below if your site uses different ones. -->
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
 <style>
   /* Brand tokens - tweak these to restyle everything */
   :root {
     --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
     --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --ink: #1c1b29;        /* headings */
-    --body: #55556a;       /* paragraph text */
-    --muted: #8a8a9e;      /* labels / placeholder */
-    --accent: #6d5ae6;     /* Synquery violet */
+    --ink: #1c1b29;
+    --body: #55556a;
+    --muted: #8a8a9e;
+    --accent: #6d5ae6;
     --accent-dark: #5b48d4;
     --border: #e6e6ef;
   }
@@ -23,22 +22,38 @@
   html, body { background: transparent; }
   body {
     font-family: var(--sans);
-    padding: 0;
     color: var(--body);
     -webkit-font-smoothing: antialiased;
-    display: flex;
-    justify-content: center;  /* center the input group horizontally */
+    text-align: center;              /* center everything */
+    padding: 8px 20px;
   }
-  .container { max-width: 520px; width: 100%; margin: 0 auto; }
+  /* Everything lives in one centered column */
+  .container { max-width: 680px; margin: 0 auto; }
 
-  label {
-    display: block;
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--muted);
-    margin-bottom: 10px;
+  .subhead {
+    font-family: var(--sans);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 14px;
   }
-  .input-row { display: flex; gap: 10px; }
+  .intro {
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--body);
+    margin: 0 auto 26px;
+    max-width: 640px;
+  }
+  .intro strong { color: var(--ink); font-weight: 600; }
+
+  /* Search bar: a compact, centered group */
+  .input-row {
+    display: flex;
+    gap: 10px;
+    max-width: 520px;
+    margin: 0 auto;
+    justify-content: center;
+  }
   input {
     flex: 1;
     padding: 15px 18px;
@@ -48,6 +63,7 @@
     font-size: 17px;
     color: var(--ink);
     outline: none;
+    text-align: left;
     transition: border-color 0.18s, box-shadow 0.18s;
   }
   input::placeholder { color: var(--muted); }
@@ -68,11 +84,14 @@
   button:hover { background: var(--accent-dark); }
   button:disabled { opacity: 0.55; cursor: default; }
 
+  /* Result: centered block, left-aligned text for readability */
   .result {
-    margin-top: 22px;
+    max-width: 520px;
+    margin: 22px auto 0;
     padding: 20px 22px;
     border-radius: 14px;
     font-size: 16px;
+    text-align: left;
     display: none;
   }
   .result.verified    { background: #f3f1fe; border: 1px solid #ddd6fe; color: #3f2f9e; }
@@ -92,17 +111,28 @@
   .result.verified a     { background: var(--accent); color: #fff; }
   .result.not-verified a { background: #9a3412; color: #fff; }
 
-  /* Phone: stack the button under the input so nothing runs off-screen */
+  /* Phone: stack the button under the input */
   @media (max-width: 480px) {
+    .subhead { font-size: 19px; }
+    .intro { font-size: 15px; }
     .input-row { flex-direction: column; align-items: stretch; gap: 12px; }
     button { width: 100%; }
-    input, button { font-size: 16px; } /* 16px stops iOS auto-zoom on focus */
+    input, button { font-size: 16px; }   /* 16px stops iOS auto-zoom */
     .result { font-size: 15px; }
   }
 </style>
 </head>
 <body>
 <div class="container">
+  <h2 class="subhead">Received an email from Synquery?</h2>
+  <p class="intro">
+    We use AI to reach out at scale — so if our email landed in your inbox, it was
+    intentional. Every message comes from a <strong>real person on our team</strong>.
+    Enter the address below to confirm it's legitimate, or report it to us if something
+    doesn't look right. Feel free to <strong>find your team member on LinkedIn to put a
+    face to the name</strong>.
+  </p>
+
   <div class="input-row">
     <input id="emailInput" type="email" autocomplete="off" spellcheck="false"
            placeholder="name@synquery.ai" />
@@ -112,12 +142,9 @@
 </div>
 
 <script>
-  // Config
-  // The anon key is safe to expose: it can ONLY call verify_sender (one email
-  // in, one answer out). It cannot read the table or list any addresses.
+  // Config — anon key is safe to expose: it can ONLY call verify_sender.
   const SUPABASE_URL = "https://fgbctkcdpwexbuyuuosi.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnYmN0a2NkcHdleGJ1eXV1b3NpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxMDI0MzcsImV4cCI6MjA3MDY3ODQzN30.aiWMUM_aZlH7O170nMbUpY8iG74usxOw5dgSQJuw8rc";
-  // Where "Report as spam" sends. Use a REAL Synquery inbox, not a sending domain.
   const REPORT_EMAIL = "support@synquery.ai";
 
   const input  = document.getElementById("emailInput");
@@ -129,8 +156,6 @@
 
   function looksLikeEmail(v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
 
-  // Build result DOM with textContent only — no innerHTML, so a stored name
-  // can never inject markup/script.
   function render(kind, title, subNodes, link) {
     resultEl.className = "result " + kind;
     resultEl.replaceChildren();
@@ -160,7 +185,6 @@
     resultEl.style.display = "block";
   }
 
-  // Only trust https LinkedIn URLs — guards against a bad/garbage row.
   function safeLinkedIn(url) {
     if (!url) return null;
     try {
