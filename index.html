@@ -27,7 +27,7 @@
     color: var(--body);
     -webkit-font-smoothing: antialiased;
   }
-  .container { max-width: 600px; }
+  .container { max-width: 600px; width: 100%; }
 
   label {
     display: block;
@@ -89,6 +89,14 @@
   }
   .result.verified a     { background: var(--accent); color: #fff; }
   .result.not-verified a { background: #9a3412; color: #fff; }
+
+  /* Phone: stack the button under the input so nothing runs off-screen */
+  @media (max-width: 480px) {
+    .input-row { flex-direction: column; align-items: stretch; gap: 12px; }
+    button { width: 100%; }
+    input, button { font-size: 16px; } /* 16px stops iOS auto-zoom on focus */
+    .result { font-size: 15px; }
+  }
 </style>
 </head>
 <body>
